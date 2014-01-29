@@ -1,0 +1,16 @@
+name: KitPvP
+version: 1.1
+main: me.oliver276.kitpvp.Main
+description: KitPvP
+
+commands:
+    kitpvp:
+        usage: /<command>
+        description: Basic command for KitPvP.
+permissions:
+    kitpvp.join:
+        default: true
+    kitpvp.setinv:
+        default: op
+    kitpvp.setspawn:
+        default: op
