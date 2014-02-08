@@ -1,5 +1,6 @@
 package me.oliver276.kitpvp;
 
+import net.minecraft.server.v1_7_R1.Explosion;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -22,16 +23,16 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.material.Sandstone;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ListIterator;
+import java.lang.reflect.Array;
+import java.net.URISyntaxException;
+import java.util.*;
 
 public class Main extends JavaPlugin implements Listener{
 
@@ -164,10 +165,24 @@ public class Main extends JavaPlugin implements Listener{
     }
 
     public void unscramble(){
-        kitlis = (List<String>) getConfig().getList("kitlist");
-        ListIterator<String> lit = kitlis.listIterator();
-        for (;lit.hasNext();){
-            kits.add(lit.next());
+        try {
+            String thi = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+            String str = thi.substring(0, thi.lastIndexOf('/'));
+            String string = str + "/KitPvP/";
+            File folder = new File(string);
+            String[] files = folder.list();
+            List<String> array = Arrays.asList(files);
+            for (String st : array){
+                if (st.endsWith("kitarm") || st.endsWith("yml")){
+                    continue;
+                }
+                String stri = st.replaceAll(".kitinv","");
+                kits.add(stri);
+            }
+            System.out.println(array);
+            System.out.println(kits);
+        } catch (URISyntaxException ex) {
+
         }
     }
 
@@ -225,8 +240,6 @@ public class Main extends JavaPlugin implements Listener{
         getConfig().set("spawn.pitch",ArenaSpawn.getPitch());
         saveConfig();
 
-        getConfig().set("kitlist",kits);
-        saveConfig();
         for (String s : kits){
             saveKit(kit.get(s),s,this);
         }
@@ -378,7 +391,8 @@ public class Main extends JavaPlugin implements Listener{
 
     @EventHandler
     public void onEntityExplodeEvent(EntityExplodeEvent e){
-        World world = Bukkit.getWorld("PvP");
+        if (ArenaSpawn == null) return;
+        World world = Bukkit.getWorld(this.ArenaSpawn.getWorld().getName());
         if (e.getLocation().getWorld().equals(world)){
             try{
                 if (e.getEntity().getType().equals(EntityType.UNKNOWN)){
@@ -463,10 +477,6 @@ public class Main extends JavaPlugin implements Listener{
             getConfig().set("stats.deaths." + died.getName().toLowerCase(),getConfig().getInt(("stats.deaths." + died.getName().toLowerCase())) + 1);
 
             saveConfig();
-            //Continue saving the player stats saving every death
-
-            //Also retrive when needed from the onCommand
-            //Remove HashMaps for the kills and the deaths.
             killer.setExp(e.getDroppedExp() + killer.getExp());
 
             e.getEntity().getInventory().clear();
@@ -480,9 +490,6 @@ public class Main extends JavaPlugin implements Listener{
     public void onPlayerDropItem(PlayerDropItemEvent e){
         if (inGame.contains(e.getPlayer())){
             e.setCancelled(true);
-            //ItemStack i = e.getItemDrop().getItemStack();
-            //e.getPlayer().getInventory().addItem(i);
-            //e.getItemDrop().remove();
         e.getPlayer().sendMessage(ChatColor.RED + "You can't drop items in here!");
         }
     }
@@ -499,8 +506,51 @@ public class Main extends JavaPlugin implements Listener{
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvp setinv <KitName>");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP setspawn");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP kit <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP removekit <KitName>");
                 return true;
 
+            }
+            if (args[0].equalsIgnoreCase("removekit")){
+                if (!(sender.hasPermission("kitpvp.removekit"))) {
+                    sender.sendMessage(ChatColor.RED + "Try again... When you have permission.");
+                    return true;
+                }
+                if (arg != 2){
+                    sender.sendMessage(ChatColor.RED + "You should put 1 kit as an argument.");
+                    return true;
+                }
+                String kitname = args[1];
+                if (!((kit.containsKey(kitname) || kits.contains(kitname) || kitarm.containsKey(kitname)))){
+                    sender.sendMessage(ChatColor.RED + "That kit was not found! xD");
+                    return true;
+                }
+                kits.remove(kitname);
+                kit.remove(kitname);
+                kitarm.remove(kitname);
+                String thi;
+                try{
+                    thi = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                }catch (Exception ex){
+                  thi = "turd";
+                }
+                String str = thi.substring(0, thi.lastIndexOf('/'));
+                String string = str + "/KitPvP/";
+                if (new File(string + kitname + ".kitarm").exists()){
+                    System.out.println(new File(string + kitname + ".kitarm").exists());
+                    File s = new File(string);
+                    if (!s.delete()){
+                        s.deleteOnExit();
+                    }
+                }
+                if (new File(string + kitname + ".kitinv").exists()){
+                    System.out.println(new File(string + kitname + ".kitinv").exists());
+                    File s = new File(string);
+                    if (s.delete()){
+                        s.deleteOnExit();
+                    }
+                }
+                sender.sendMessage(ChatColor.GOLD + "Done, but you'll need to actually delete the files...");
+                return true;
             }
             if (args[0].equalsIgnoreCase("kit")){
                 if (!(sender instanceof Player)){

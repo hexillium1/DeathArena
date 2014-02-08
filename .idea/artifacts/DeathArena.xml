@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="DeathArena">
+    <output-path>C:/ProgramData/Bukkit/plugins</output-path>
+    <root id="archive" name="DeathArena.jar">
+      <element id="module-output" name="KitPvP" />
+    </root>
+  </artifact>
+</component>
