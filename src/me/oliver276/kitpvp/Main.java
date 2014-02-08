@@ -378,7 +378,7 @@ public class Main extends JavaPlugin implements Listener{
             ItemStack s = new ItemStack(b.getType());
             if (s.getType().equals(new ItemStack(Material.TNT).getType())){
                 b.setType(Material.AIR);
-                World w = Bukkit.getWorld("PvP");
+                World w = ArenaSpawn.getWorld();
                 Location loc = e.getBlockPlaced().getLocation().add(0,1,0);
                 w.spawnEntity(loc, EntityType.PRIMED_TNT);
                 tnt = 1;
@@ -405,7 +405,7 @@ public class Main extends JavaPlugin implements Listener{
             }
             if (e.getEntity().getType().equals(EntityType.PRIMED_TNT)){
                 e.setCancelled(true);
-                World w = Bukkit.getWorld("PvP");
+                World w = ArenaSpawn.getWorld();
                 w.createExplosion(e.getLocation(),4);
             }
         }
@@ -461,6 +461,9 @@ public class Main extends JavaPlugin implements Listener{
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent e){
         try {
+            if(inGame.contains(e.getEntity())){
+                e.getDrops().clear();
+            }
         if(inGame.contains(e.getEntity())&&inGame.contains(e.getEntity().getKiller())){
             e.getDrops().clear();
             e.setDeathMessage(null);
