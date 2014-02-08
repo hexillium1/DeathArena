@@ -447,12 +447,9 @@ public class Main extends JavaPlugin implements Listener{
             }
         }else if(e.getDamager() instanceof Player){
             Player attacker = (Player) e.getDamager();
-
             if ((!(inGame.contains(attacker)))) return;
-
             e.setCancelled(true);
-
-        }else if(e.getEntity() instanceof Player){
+            }else if(e.getEntity() instanceof Player){
             Player victim = (Player) e.getEntity();
 
             if ((!(inGame.contains(victim))) || e.getDamager().getType().equals(EntityType.ARROW) || e.getDamager().getType().equals(EntityType.FISHING_HOOK)) return;
