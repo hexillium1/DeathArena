@@ -28,6 +28,8 @@ public class PlayerIdle extends BukkitRunnable{
     }
 
     public void run() {
+        if (map.isEmpty()) return;
+        try{
        for (Player player : map.keySet()){
            if (player == null) continue;
            int i = map.remove(player);
@@ -41,5 +43,7 @@ public class PlayerIdle extends BukkitRunnable{
                map.put(player,0);
            }
        }
-    }
+    }catch (Exception ex){
+        }
+}
 }

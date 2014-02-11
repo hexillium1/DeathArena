@@ -26,6 +26,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Sandstone;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.Potion;
+import org.bukkit.potion.PotionEffect;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
@@ -33,6 +35,7 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 public class Main extends JavaPlugin implements Listener{
 
@@ -87,6 +90,7 @@ public class Main extends JavaPlugin implements Listener{
     private HashMap<String,ItemStack[]> kit = new HashMap<String, ItemStack[]>();
     private HashMap<String,ItemStack[]> kitarm = new HashMap<String, ItemStack[]>();
     private HashMap<String,String> LastKit = new HashMap<String, String>();
+    private HashMap<String,Collection<PotionEffect>> kitEffects = new HashMap<String, Collection<PotionEffect>>();
     private ArrayList<String> kits = new ArrayList<String>();
     private Location ArenaSpawn = null;
     private HashMap<String,Location> PreviousPos = new HashMap<String, Location>();
@@ -109,6 +113,7 @@ public class Main extends JavaPlugin implements Listener{
         LastKit.remove(p.getName());
         PreviousPos.remove(p.getName());
         onIngameChange(0,p);
+        p.getActivePotionEffects().clear();
 
     }
 
@@ -120,21 +125,21 @@ public class Main extends JavaPlugin implements Listener{
         player.teleport(ArenaSpawn);
         inGame.add(player);
         PrevHealth.put(player.getName(), player.getHealth());
+        player.getActivePotionEffects().clear();
+        for (PotionEffect pot : kitEffects.get(kitname)){
+            player.addPotionEffect(pot);
+        }
         player.sendMessage(ChatColor.GREEN + "You joined KitPvP");
         player.getInventory().setContents(kit.get(kitname));
         player.getInventory().setArmorContents(kitarm.get(kitname));
         player.teleport(ArenaSpawn);
         LastKit.put(player.getName(),kitname);
         onIngameChange(1,player);
+        player.updateInventory();
+        player.setGameMode(GameMode.SURVIVAL);
     }
 
     public static void onIngameChange(int Added,Player player){
-        if (Added == 1){
-            PlayerIdle.addPlayer(player);
-        }else{
-            PlayerIdle.removePlayer(player);
-        }
-
     }
 
     public void GetStuff(){
@@ -173,14 +178,17 @@ public class Main extends JavaPlugin implements Listener{
             String[] files = folder.list();
             List<String> array = Arrays.asList(files);
             for (String st : array){
-                if (st.endsWith("kitarm") || st.endsWith("yml")){
+                if (st.endsWith("kitarm") || st.endsWith("yml") || st.endsWith(".kiteff")){
                     continue;
                 }
                 String stri = st.replaceAll(".kitinv","");
+                if (stri.contains("kiteff")){
+                    continue;
+                }
+                System.out.print("KitEff : " + stri);
                 kits.add(stri);
             }
-            System.out.println(array);
-            System.out.println(kits);
+            System.out.println("Kits: " + kits);
         } catch (URISyntaxException ex) {
 
         }
@@ -209,26 +217,62 @@ public class Main extends JavaPlugin implements Listener{
             e.printStackTrace();
         }
     }
+    public void saveKitPot(Collection<PotionEffect> effects, String name, Plugin plg){
+        FileConfiguration cfg = null;
+        File file = new File(plg.getDataFolder(), name + ".kiteff");
+        cfg = YamlConfiguration.loadConfiguration(file);
+        cfg.set("CONTENT", effects);
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public void loadKitPot(String name){
+        FileConfiguration cfg = null;
+        File file = new File(this.getDataFolder(), name + ".kiteff");
+        cfg = YamlConfiguration.loadConfiguration(file);
+        List<PotionEffect> Inv = (List<PotionEffect>) cfg.getList("CONTENT");
+        Collection<PotionEffect> Effects = Inv;
+        kitEffects.put(name,Effects);
+    }
 
     public void onEnable(){
-        BukkitTask TaskName = new PlayerIdle(this).runTaskTimer(this, 20, 20);
+        //BukkitTask TaskName = new PlayerIdle(this).runTaskTimer(this, 20, 20);
         GetStuff();
         unscramble();
+        System.out.print("Kits: " + kits);
+        try{
         for (String s : kits){
             loadKit(s);
         }
+        }catch (Exception ex){
+
+        }
+        try{
         for (String s : kits){
             loadKitArm(s);
         }
+        }catch (Exception ex){
 
-    }
-
-    @EventHandler (priority  = EventPriority.MONITOR)
-    public void onPlayerMove(PlayerMoveEvent e){
-        if (inGame.contains(e.getPlayer())){
-            PlayerIdle.HeMoved(e.getPlayer());
         }
+
+        try{
+        for (String s : kits){
+            loadKitPot(s);
+        }
+        }catch (Exception ex){
+
+        }
+
     }
+
+    //@EventHandler (priority  = EventPriority.MONITOR)
+    //public void onPlayerMove(PlayerMoveEvent e){
+        //if (inGame.contains(e.getPlayer())){
+          //  PlayerIdle.HeMoved(e.getPlayer());
+        //}
+    //}
 
     public void onDisable(){
         reloadConfig();
@@ -245,6 +289,9 @@ public class Main extends JavaPlugin implements Listener{
         }
         for (String s : kits){
             saveKitArm(kitarm.get(s),s,this);
+        }
+        for (String s : kits){
+            saveKitPot(kitEffects.get(s),s,this);
         }
         if (inGame.isEmpty()) return;
         for (Player player : inGame){
@@ -353,7 +400,9 @@ public class Main extends JavaPlugin implements Listener{
 
         e.getPlayer().getInventory().setContents(kit.get(lastkit));
         e.getPlayer().getInventory().setArmorContents(kitarm.get(lastkit));
+        e.getPlayer().addPotionEffects(kitEffects.get(lastkit));
         e.setRespawnLocation(ArenaSpawn);
+        e.getPlayer().updateInventory();
 
     }
 
@@ -377,7 +426,8 @@ public class Main extends JavaPlugin implements Listener{
             Block b = e.getBlock();
             ItemStack s = new ItemStack(b.getType());
             if (s.getType().equals(new ItemStack(Material.TNT).getType())){
-                b.setType(Material.AIR);
+                Material material = e.getBlockReplacedState().getType();
+                b.setType(material);
                 World w = ArenaSpawn.getWorld();
                 Location loc = e.getBlockPlaced().getLocation().add(0,1,0);
                 w.spawnEntity(loc, EntityType.PRIMED_TNT);
@@ -452,7 +502,7 @@ public class Main extends JavaPlugin implements Listener{
             }else if(e.getEntity() instanceof Player){
             Player victim = (Player) e.getEntity();
 
-            if ((!(inGame.contains(victim))) || e.getDamager().getType().equals(EntityType.ARROW) || e.getDamager().getType().equals(EntityType.FISHING_HOOK)) return;
+            if ((!(inGame.contains(victim))) || e.getDamager().getType().equals(EntityType.ARROW) || e.getDamager().getType().equals(EntityType.FISHING_HOOK) || e.getDamager().getType().equals(EntityType.SPLASH_POTION)) return;
 
             e.setCancelled(true);
         }
@@ -503,7 +553,7 @@ public class Main extends JavaPlugin implements Listener{
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvp join <KitName>");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP leave");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP stats");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvp setinv <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP setinv <KitName>");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP setspawn");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP kit <KitName>");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP removekit <KitName>");
@@ -687,11 +737,12 @@ public class Main extends JavaPlugin implements Listener{
                         kits.remove(kitName);
                         kit.remove(kitName);
                         kitarm.remove(kitName);
+                        kitEffects.remove(kitName);
                     }
                     kit.put(kitName,pl.getInventory().getContents());
                     kitarm.put(kitName,pl.getInventory().getArmorContents());
                     kits.add(kitName);
-
+                    kitEffects.put(kitName,pl.getActivePotionEffects());
 
                     pl.sendMessage(ChatColor.DARK_GREEN + "Inventory saved :)");
                 }else{
