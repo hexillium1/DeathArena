@@ -1,6 +1,5 @@
 package me.oliver276.kitpvp;
 
-import net.minecraft.server.v1_7_R1.Explosion;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -23,19 +22,16 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.material.Sandstone;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.Potion;
 import org.bukkit.potion.PotionEffect;
-import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
 public class Main extends JavaPlugin implements Listener{
 
@@ -112,31 +108,44 @@ public class Main extends JavaPlugin implements Listener{
         p.setHealth(PrevHealth.remove(p.getName()));
         LastKit.remove(p.getName());
         PreviousPos.remove(p.getName());
-        onIngameChange(0,p);
-        p.getActivePotionEffects().clear();
+        onIngameChange(0, p);
+        for (PotionEffectType potionEffect : PotionEffectType.values()){
+            try{
+                p.removePotionEffect(potionEffect);
+            }catch(NullPointerException ex){
+                System.out.print("NPE " + ex.getCause());
+            }
+        }
+
 
     }
 
     public void Join(Player player,String kitname){
+        for (PotionEffectType potionEffect : PotionEffectType.values()){
+            try{
+                player.removePotionEffect(potionEffect);
+            }catch(NullPointerException ex){
+                System.out.print("NPE" + ex.getCause());
+            }
+
+        }
         saveInventory(player);
-        PreviousPos.put(player.getName(),player.getLocation());
+        PreviousPos.put(player.getName(), player.getLocation());
         player.getInventory().clear();
         player.getInventory().setArmorContents(null);
         player.teleport(ArenaSpawn);
         inGame.add(player);
         PrevHealth.put(player.getName(), player.getHealth());
-        player.getActivePotionEffects().clear();
-        for (PotionEffect pot : kitEffects.get(kitname)){
-            player.addPotionEffect(pot);
-        }
         player.sendMessage(ChatColor.GREEN + "You joined KitPvP");
         player.getInventory().setContents(kit.get(kitname));
         player.getInventory().setArmorContents(kitarm.get(kitname));
         player.teleport(ArenaSpawn);
-        LastKit.put(player.getName(),kitname);
-        onIngameChange(1,player);
+        LastKit.put(player.getName(), kitname);
         player.updateInventory();
         player.setGameMode(GameMode.SURVIVAL);
+        for (PotionEffect pot : kitEffects.get(kitname)){
+            player.addPotionEffect(pot);
+        }
     }
 
     public static void onIngameChange(int Added,Player player){
@@ -375,7 +384,7 @@ public class Main extends JavaPlugin implements Listener{
                     }
                     LastKit.remove(e.getPlayer().getName());
                     LastKit.put(e.getPlayer().getName(), sign.getLine(2));
-                    e.getPlayer().sendMessage(ChatColor.GOLD + "You've changed kit to " +ChatColor.AQUA +  sign.getLine(2) + ChatColor.GOLD + ".  You'lfcvl recieve it when you next respawn!");
+                    e.getPlayer().sendMessage(ChatColor.GOLD + "You've changed kit to " +ChatColor.AQUA +  sign.getLine(2) + ChatColor.GOLD + ".  You'll recieve it when you next respawn!");
                     return;
                 }
                 if (sign.getLine(1).equalsIgnoreCase("leave")) {
@@ -398,12 +407,34 @@ public class Main extends JavaPlugin implements Listener{
         String PlayerName = e.getPlayer().getName();
         String lastkit =  LastKit.get(PlayerName);
 
-        e.getPlayer().getInventory().setContents(kit.get(lastkit));
-        e.getPlayer().getInventory().setArmorContents(kitarm.get(lastkit));
-        e.getPlayer().addPotionEffects(kitEffects.get(lastkit));
+        for (PotionEffectType potionEffect : PotionEffectType.values()){
+            try{
+                e.getPlayer().removePotionEffect(potionEffect);
+            }catch(NullPointerException ex){
+                System.out.print("NPE " + ex.getCause());
+            }
+        }
+        final String semi = lastkit;
+        final Player semip = e.getPlayer();
+        Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new BukkitRunnable() {
+            public void run() {
+                giveEffects(semip, semi);
+                Bukkit.getScheduler().cancelTasks(plugin);
+            }
+        }, 20, 200);
         e.setRespawnLocation(ArenaSpawn);
-        e.getPlayer().updateInventory();
+    }
+    Plugin plugin = this;
 
+    
+
+    public void giveEffects(Player player, String lastkit){
+        for (PotionEffect pot : kitEffects.get(lastkit)){
+            player.addPotionEffect(pot);
+        }
+        player.updateInventory();
+        player.getInventory().setContents(kit.get(lastkit));
+        player.getInventory().setArmorContents(kitarm.get(lastkit));
     }
 
     @EventHandler
@@ -472,7 +503,7 @@ public class Main extends JavaPlugin implements Listener{
     @EventHandler
     public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent e){
         if (!(inGame.contains(e.getPlayer()))) return;
-        if (e.getMessage().startsWith("/kitpvp")) return;
+        if (e.getMessage().startsWith("/kitpvp") || e.getMessage().startsWith("/deatharena")) return;
         if  (!(e.getPlayer().getName().equals("Notch or Jeb"))){
             e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/kitpvp leave");
             e.setCancelled(true);
@@ -520,7 +551,7 @@ public class Main extends JavaPlugin implements Listener{
             Player died = e.getEntity();
             Player killer = died.getKiller();
 
-            Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.GOLD + killer.getName() + " just killed " + died.getName() + ".");
+            Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.GOLD + killer.getName() + " (on " + killer.getHealth()/2 + " hearts) just killed " + died.getName() + ".");
 
             getConfig().set("stats.kills." + killer.getName().toLowerCase(),getConfig().getInt(("stats.kills." + killer.getName().toLowerCase())) + 1);
 
@@ -687,7 +718,7 @@ public class Main extends JavaPlugin implements Listener{
                     return true;
                 }
                 String kitname = args[1];
-                if ((!(kit.containsKey(kitname))) || (!(sender.hasPermission("kitpvp.kit." + kitname)))){
+                if ((!(kits.contains(kitname))) || (!(sender.hasPermission("kitpvp.kit." + kitname)))){
                     sender.sendMessage(ChatColor.DARK_RED + "The "+ kitname +" kit does not exist or you don't have permission for it!  These kits exist:");
                     sender.sendMessage(ChatColor.GOLD + kits.toString());
                     return true;

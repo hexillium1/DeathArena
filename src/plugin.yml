@@ -1,5 +1,5 @@
 name: KitPvP
-version: 1.3
+version: 1.4
 main: me.oliver276.kitpvp.Main
 description: KitPvP
 
@@ -7,6 +7,7 @@ commands:
     kitpvp:
         usage: /<command>
         description: Basic command for KitPvP.
+        aliases: [DeathArena]
 permissions:
     kitpvp.join:
         default: true
