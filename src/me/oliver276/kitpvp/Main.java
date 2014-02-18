@@ -451,7 +451,7 @@ public class Main extends JavaPlugin implements Listener{
 
         String PlayerName = e.getPlayer().getName();
         String lastkit =  LastKit.get(PlayerName);
-
+        e.setRespawnLocation(ArenaSpawn);
         for (PotionEffectType potionEffect : PotionEffectType.values()){
             try{
                 e.getPlayer().removePotionEffect(potionEffect);
@@ -549,7 +549,11 @@ public class Main extends JavaPlugin implements Listener{
     @EventHandler
     public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent e){
         if (!(inGame.contains(e.getPlayer()))) return;
+        List<String> StringList = (List<String>) getConfig().getList("CommandWhitelist");
         if (e.getMessage().startsWith("/kitpvp") || e.getMessage().startsWith("/deatharena")) return;
+        for (String  str : StringList){
+            if (e.getMessage().startsWith("/" + str));
+        }
         if  (!(e.getPlayer().getName().equals("Notch or Jeb"))){
             e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/kitpvp leave");
             e.setCancelled(true);
@@ -596,7 +600,7 @@ public class Main extends JavaPlugin implements Listener{
             e.setDeathMessage(null);
             Player died = e.getEntity();
             Player killer = died.getKiller();
-            if (died == killer){                              // Make sure that the player hasn't killed them self
+            if (died != killer){                              // Make sure that the player hasn't killed them self
                 Double hearts = killer.getHealth();
                 Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.BLUE + killer.getName() + ChatColor.GOLD + " (on " + ( Math.round(hearts)) /2 + " hearts) just killed " + ChatColor.BLUE + died.getName() + ChatColor.GOLD + " and earned " + getConfig().getInt("moneyperkill")+ " " + ChatColor.BLUE+ economy.currencyNamePlural() + ChatColor.GOLD + ".");
                 economy.depositPlayer(killer.getName(),getConfig().getInt("moneyperkill"));

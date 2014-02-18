@@ -1,1 +1,3 @@
 moneyperkill: 5
+CommandWhitelist:
+  - money
