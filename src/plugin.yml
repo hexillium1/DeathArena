@@ -2,7 +2,7 @@ name: KitPvP
 version: 1.4
 main: me.oliver276.kitpvp.Main
 description: KitPvP
-
+softdepend: [Vault]
 commands:
     kitpvp:
         usage: /<command>

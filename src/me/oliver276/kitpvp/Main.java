@@ -1,5 +1,9 @@
 package me.oliver276.kitpvp;
 
+import net.milkbowl.vault.chat.Chat;
+import net.milkbowl.vault.chat.plugins.Chat_PermissionsEx;
+import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.permission.Permission;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -23,6 +27,7 @@ import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -91,7 +96,7 @@ public class Main extends JavaPlugin implements Listener{
     private Location ArenaSpawn = null;
     private HashMap<String,Location> PreviousPos = new HashMap<String, Location>();
     private HashMap<String,Double> PrevHealth = new HashMap<String, Double>();
-
+    public boolean hasEconomy = false;
 
     private List<String> kitlis = null;
 
@@ -113,9 +118,9 @@ public class Main extends JavaPlugin implements Listener{
             try{
                 p.removePotionEffect(potionEffect);
             }catch(NullPointerException ex){
-                System.out.print("NPE " + ex.getCause());
             }
         }
+        p.updateInventory();
 
 
     }
@@ -125,9 +130,7 @@ public class Main extends JavaPlugin implements Listener{
             try{
                 player.removePotionEffect(potionEffect);
             }catch(NullPointerException ex){
-                System.out.print("NPE" + ex.getCause());
             }
-
         }
         saveInventory(player);
         PreviousPos.put(player.getName(), player.getLocation());
@@ -155,9 +158,13 @@ public class Main extends JavaPlugin implements Listener{
         Bukkit.getPluginManager().registerEvents(this,this);
         getConfig().options().copyDefaults(true);
         saveConfig();
-        if (getConfig().contains("spawn.world")){
+        if (!getConfig().contains("spawn.world")) return;
+        try{
+            getServer().getWorld("spawn.world");
             World w = Bukkit.getWorld(getConfig().getString("spawn.world"));
             ArenaSpawn = new Location(w,getConfig().getDouble("spawn.x"),getConfig().getDouble("spawn.y"),getConfig().getDouble("spawn.z"),Float.parseFloat(getConfig().getString("spawn.yaw")),Float.parseFloat(getConfig().getString("spawn.pitch")));
+        }catch (Exception ex){
+            System.out.print("World does not exist!");
         }
     }
     public void loadKit(String name){
@@ -245,8 +252,46 @@ public class Main extends JavaPlugin implements Listener{
         Collection<PotionEffect> Effects = Inv;
         kitEffects.put(name,Effects);
     }
+    public static Permission permission = null;
+    public static Economy economy = null;
+    public static Chat chat = null;
+
+    private boolean setupPermissions()
+    {
+        RegisteredServiceProvider<Permission> permissionProvider = getServer().getServicesManager().getRegistration(net.milkbowl.vault.permission.Permission.class);
+        if (permissionProvider != null) {
+            permission = permissionProvider.getProvider();
+        }
+        return (permission != null);
+    }
+
+    private boolean setupChat()
+    {
+        RegisteredServiceProvider<Chat> chatProvider = getServer().getServicesManager().getRegistration(net.milkbowl.vault.chat.Chat.class);
+        if (chatProvider != null) {
+            chat = chatProvider.getProvider();
+        }
+
+        return (chat != null);
+    }
+
+    private boolean setupEconomy()
+    {
+        RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(net.milkbowl.vault.economy.Economy.class);
+        if (economyProvider != null) {
+            economy = economyProvider.getProvider();
+        }
+
+        return (economy != null);
+    }
 
     public void onEnable(){
+        if (Bukkit.getPluginManager().isPluginEnabled("Vault")){
+            setupPermissions();
+            setupChat();
+            setupEconomy();
+            hasEconomy = true;
+        }
         //BukkitTask TaskName = new PlayerIdle(this).runTaskTimer(this, 20, 20);
         GetStuff();
         unscramble();
@@ -411,18 +456,19 @@ public class Main extends JavaPlugin implements Listener{
             try{
                 e.getPlayer().removePotionEffect(potionEffect);
             }catch(NullPointerException ex){
-                System.out.print("NPE " + ex.getCause());
             }
         }
         final String semi = lastkit;
         final Player semip = e.getPlayer();
-        Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new BukkitRunnable() {
+        int i = this.getServer().getScheduler().scheduleSyncDelayedTask(this, new BukkitRunnable() {
             public void run() {
-                giveEffects(semip, semi);
-                Bukkit.getScheduler().cancelTasks(plugin);
+                semip.getInventory().setContents(kit.get(semi));
+                semip.getInventory().setArmorContents(kitarm.get(semi));
+                semip.addPotionEffects(kitEffects.get(semi));
             }
-        }, 20, 200);
-        e.setRespawnLocation(ArenaSpawn);
+        }, 20L);
+
+
     }
     Plugin plugin = this;
 
@@ -550,15 +596,15 @@ public class Main extends JavaPlugin implements Listener{
             e.setDeathMessage(null);
             Player died = e.getEntity();
             Player killer = died.getKiller();
-
-            Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.GOLD + killer.getName() + " (on " + killer.getHealth()/2 + " hearts) just killed " + died.getName() + ".");
-
-            getConfig().set("stats.kills." + killer.getName().toLowerCase(),getConfig().getInt(("stats.kills." + killer.getName().toLowerCase())) + 1);
-
+            if (died == killer){                              // Make sure that the player hasn't killed them self
+                Double hearts = killer.getHealth();
+                Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.BLUE + killer.getName() + ChatColor.GOLD + " (on " + ( Math.round(hearts)) /2 + " hearts) just killed " + ChatColor.BLUE + died.getName() + ChatColor.GOLD + " and earned " + getConfig().getInt("moneyperkill")+ " " + ChatColor.BLUE+ economy.currencyNamePlural() + ChatColor.GOLD + ".");
+                economy.depositPlayer(killer.getName(),getConfig().getInt("moneyperkill"));
+                getConfig().set("stats.kills." + killer.getName().toLowerCase(),getConfig().getInt(("stats.kills." + killer.getName().toLowerCase())) + 1);
+            }
             getConfig().set("stats.deaths." + died.getName().toLowerCase(),getConfig().getInt(("stats.deaths." + died.getName().toLowerCase())) + 1);
 
             saveConfig();
-            killer.setExp(e.getDroppedExp() + killer.getExp());
 
             e.getEntity().getInventory().clear();
         }
@@ -567,12 +613,14 @@ public class Main extends JavaPlugin implements Listener{
         }
     }
 
+
     @EventHandler
-    public void onPlayerDropItem(PlayerDropItemEvent e){
+    public void onPlayerDropItem(PlayerDropItemEvent e){                             //Stop the players dropping anything
         if (inGame.contains(e.getPlayer())){
             e.setCancelled(true);
         e.getPlayer().sendMessage(ChatColor.RED + "You can't drop items in here!");
         }
+
     }
 
     @Override
@@ -581,7 +629,7 @@ public class Main extends JavaPlugin implements Listener{
             int arg = args.length;
             if (arg == 0 || args[0].equalsIgnoreCase("help")){
                 sender.sendMessage(ChatColor.GREEN + "-=-=-= KitPvP Help =-=-=-");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvp join <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP join <KitName>");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP leave");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP stats");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP setinv <KitName>");
@@ -592,16 +640,16 @@ public class Main extends JavaPlugin implements Listener{
 
             }
             if (args[0].equalsIgnoreCase("removekit")){
-                if (!(sender.hasPermission("kitpvp.removekit"))) {
+                if (!(sender.hasPermission("kitpvp.removekit"))) {                                    //No permissions
                     sender.sendMessage(ChatColor.RED + "Try again... When you have permission.");
                     return true;
                 }
                 if (arg != 2){
-                    sender.sendMessage(ChatColor.RED + "You should put 1 kit as an argument.");
+                    sender.sendMessage(ChatColor.RED + "You should put 1 kit as an argument.");       //Haven't specified 1 kit
                     return true;
                 }
                 String kitname = args[1];
-                if (!((kit.containsKey(kitname) || kits.contains(kitname) || kitarm.containsKey(kitname)))){
+                if (!((kit.containsKey(kitname) || kits.contains(kitname) || kitarm.containsKey(kitname)))){                //Make sure the kit exists
                     sender.sendMessage(ChatColor.RED + "That kit was not found! xD");
                     return true;
                 }
@@ -610,7 +658,7 @@ public class Main extends JavaPlugin implements Listener{
                 kitarm.remove(kitname);
                 String thi;
                 try{
-                    thi = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    thi = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();                //Get the plugin's data folder
                 }catch (Exception ex){
                   thi = "turd";
                 }
@@ -630,22 +678,22 @@ public class Main extends JavaPlugin implements Listener{
                         s.deleteOnExit();
                     }
                 }
-                sender.sendMessage(ChatColor.GOLD + "Done, but you'll need to actually delete the files...");
+                sender.sendMessage(ChatColor.GOLD + "Done, but you'll need to actually delete the files...");                           //Bug
                 return true;
             }
             if (args[0].equalsIgnoreCase("kit")){
                 if (!(sender instanceof Player)){
-                    sender.sendMessage(ChatColor.RED + "You can't use this.");
+                    sender.sendMessage(ChatColor.RED + "You can't use this.");                     //Console
                     return true;
                 }
                 Player p = (Player) sender;
                 if (!(inGame.contains(p))){
-                    p.sendMessage(ChatColor.RED + "You aren't in an arena!");
+                    p.sendMessage(ChatColor.RED + "You aren't in an arena!");                         //Make sure they're in a game
                     return true;
                 }
                 if (arg == 1){
                     p.sendMessage(ChatColor.RED + "Specify a new kit.");
-                    p.sendMessage(ChatColor.GOLD + "These are available" + ChatColor.DARK_AQUA + kits.toString());
+                    p.sendMessage(ChatColor.GOLD + "These are available" + ChatColor.DARK_AQUA + kits.toString());  //print the kits
                     return true;
                 }
                 String kitname = args[1];
@@ -655,7 +703,7 @@ public class Main extends JavaPlugin implements Listener{
                     return true;
                 }
                 if (!(p.hasPermission("kitpvp.kit." + kitname))){
-                    p.sendMessage(ChatColor.RED + "You do not have permission for that kit.");
+                    p.sendMessage(ChatColor.RED + "You do not have permission for that kit.");                                      //Permission
                     p.sendMessage(ChatColor.GOLD + "These are available" + ChatColor.DARK_AQUA + kits.toString());
                     return true;
                 }
@@ -685,6 +733,7 @@ public class Main extends JavaPlugin implements Listener{
 
                 sender.sendMessage(ChatColor.GREEN + player + "'s Player Kills: " + ChatColor.DARK_GREEN + kills + ChatColor.GREEN + "!");
                 sender.sendMessage(ChatColor.GREEN + player + "'s Deaths: " + ChatColor.DARK_GREEN + deaths + ChatColor.GREEN + "!");
+                sender.sendMessage(ChatColor.GREEN + player + "'s K/D Ratio: " + ChatColor.DARK_GREEN + kills / deaths + ChatColor.GREEN + "!");
                 return true;
             }
             if (args[0].equalsIgnoreCase("join")){
