@@ -552,10 +552,17 @@ public class Main extends JavaPlugin implements Listener{
         List<String> StringList = (List<String>) getConfig().getList("CommandWhitelist");
         if (e.getMessage().startsWith("/kitpvp") || e.getMessage().startsWith("/deatharena")) return;
         for (String  str : StringList){
-            if (e.getMessage().startsWith("/" + str));
+            if (e.getMessage().startsWith("/" + str)) return;
+        }
+        if (e.getMessage().startsWith("/leave")){
+            Player p = e.getPlayer();
+            Leave(p);
+            e.setCancelled(true);
+            return;
+
         }
         if  (!(e.getPlayer().getName().equals("Notch or Jeb"))){
-            e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/kitpvp leave");
+            e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/leave");
             e.setCancelled(true);
         }
     }
@@ -602,7 +609,7 @@ public class Main extends JavaPlugin implements Listener{
             Player killer = died.getKiller();
             if (died != killer){                              // Make sure that the player hasn't killed them self
                 Double hearts = killer.getHealth();
-                Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.BLUE + killer.getName() + ChatColor.GOLD + " (on " + ( Math.round(hearts)) /2 + " hearts) just killed " + ChatColor.BLUE + died.getName() + ChatColor.GOLD + " and earned " + getConfig().getInt("moneyperkill")+ " " + ChatColor.BLUE+ economy.currencyNamePlural() + ChatColor.GOLD + ".");
+                Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.BLUE + killer.getName() + ChatColor.GOLD + " (on " + ( (Math.round(hearts) + 0.1) - 0.1) /2 + " hearts) just killed " + ChatColor.BLUE + died.getName() + ChatColor.GOLD + " and earned " + getConfig().getInt("moneyperkill")+ " " + ChatColor.BLUE+ getConfig().getString("currencyname") + ChatColor.GOLD + ".");
                 economy.depositPlayer(killer.getName(),getConfig().getInt("moneyperkill"));
                 getConfig().set("stats.kills." + killer.getName().toLowerCase(),getConfig().getInt(("stats.kills." + killer.getName().toLowerCase())) + 1);
             }
@@ -633,13 +640,13 @@ public class Main extends JavaPlugin implements Listener{
             int arg = args.length;
             if (arg == 0 || args[0].equalsIgnoreCase("help")){
                 sender.sendMessage(ChatColor.GREEN + "-=-=-= KitPvP Help =-=-=-");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP join <KitName>");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP leave");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP stats");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP setinv <KitName>");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP setspawn");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP kit <KitName>");
-                sender.sendMessage(ChatColor.DARK_GREEN + "/KitPvP removekit <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " join <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " leave");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " stats");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " setinv <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " setspawn");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " kit <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " removekit <KitName>");
                 return true;
 
             }
@@ -834,7 +841,7 @@ public class Main extends JavaPlugin implements Listener{
                 }
                 return true;
             }
-            sender.sendMessage(ChatColor.RED + "Not a KitPvP command. Do " + ChatColor.YELLOW + "/kitpvp" + ChatColor.RED + " for command help.");
+            sender.sendMessage(ChatColor.RED + "Not a KitPvP command. Do " + ChatColor.YELLOW + "/" +  label + " help" + ChatColor.RED + " for command help.");
         }
         return true;
     }
