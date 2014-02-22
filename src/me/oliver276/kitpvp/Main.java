@@ -466,7 +466,7 @@ public class Main extends JavaPlugin implements Listener{
                 semip.getInventory().setArmorContents(kitarm.get(semi));
                 semip.addPotionEffects(kitEffects.get(semi));
             }
-        }, 20L);
+        }, 10L);
 
 
     }
@@ -561,10 +561,8 @@ public class Main extends JavaPlugin implements Listener{
             return;
 
         }
-        if  (!(e.getPlayer().getName().equals("Notch or Jeb"))){
-            e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/leave");
-            e.setCancelled(true);
-        }
+        e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/leave");
+        e.setCancelled(true);
     }
 
     @EventHandler
