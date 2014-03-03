@@ -15,3 +15,5 @@ permissions:
         default: op
     kitpvp.setspawn:
         default: op
+    kitpvp.reload:
+        default: false

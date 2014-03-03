@@ -32,6 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import sun.security.krb5.Config;
 
 import java.io.File;
 import java.io.IOException;
@@ -285,7 +286,113 @@ public class Main extends JavaPlugin implements Listener{
         return (economy != null);
     }
 
+    public void reload(RELOADTYPE reloadtype, CommandSender sender){
+        for (Player player : inGame){
+            player.sendMessage(ChatColor.YELLOW + "Reloading the plugin.");
+            Leave(player);
+        }
+        if (reloadtype.equals(RELOADTYPE.CONFIG)){
+            reloadConfig();
+            if (sender != null) sender.sendMessage(ChatColor.DARK_GREEN + "Config reloaded");
+        } else if (reloadtype.equals(RELOADTYPE.FILES)){
+
+
+            for (String s : kits){
+                saveKit(kit.get(s),s,this);
+            }
+            for (String s : kits){
+                saveKitArm(kitarm.get(s),s,this);
+            }
+            for (String s : kits){
+                saveKitPot(kitEffects.get(s),s,this);
+            }
+            try{
+                for (String s : kits){
+                    loadKit(s);
+                }
+            }catch (Exception ex){
+            }
+            try{
+                for (String s : kits){
+                    loadKitArm(s);
+                }
+            }catch (Exception ex){
+            }
+            try{
+                for (String s : kits){
+                    loadKitPot(s);
+                }
+            }catch (Exception ex){
+
+            }
+
+        } else if (reloadtype.equals(RELOADTYPE.SPAWNLOCATION)){
+            reloadConfig();
+            getConfig().set("spawn.world",ArenaSpawn.getWorld().getName());
+            getConfig().set("spawn.x",ArenaSpawn.getBlockX());
+            getConfig().set("spawn.y",ArenaSpawn.getBlockY());
+            getConfig().set("spawn.z",ArenaSpawn.getBlockZ());
+            getConfig().set("spawn.yaw",ArenaSpawn.getYaw());
+            getConfig().set("spawn.pitch",ArenaSpawn.getPitch());
+            saveConfig();
+        } else if (reloadtype.equals(RELOADTYPE.PLUGIN)){
+            isRestarting = true;
+            Bukkit.getPluginManager().disablePlugin(this);
+        } else if (reloadtype.equals(RELOADTYPE.SAVEFILES)){
+            for (String s : kits){
+                saveKit(kit.get(s),s,this);
+            }
+            for (String s : kits){
+                saveKitArm(kitarm.get(s),s,this);
+            }
+            for (String s : kits){
+                saveKitPot(kitEffects.get(s),s,this);
+            }
+        } else if (reloadtype.equals(RELOADTYPE.LOADFILES)){
+            try{
+                for (String s : kits){
+                    loadKit(s);
+                }
+            }catch (Exception ex){
+            }
+            try{
+                for (String s : kits){
+                    loadKitArm(s);
+                }
+            }catch (Exception ex){
+            }
+            try{
+                for (String s : kits){
+                    loadKitPot(s);
+                }
+            }catch (Exception ex){
+
+            }
+        }
+
+    }
+
+    protected boolean isRestarting = false;
+
+    public enum RELOADTYPE {
+        PLUGIN,
+        CONFIG,
+        FILES,
+        SPAWNLOCATION,
+        SAVEFILES,
+        LOADFILES;
+
+    }
+    public ArrayList<String> reloadtypelist = new ArrayList<String>();
+
+
     public void onEnable(){
+        reloadtypelist.add("PLUGIN");
+        reloadtypelist.add("CONFIG");
+        reloadtypelist.add("FILES");
+        reloadtypelist.add("SPAWNLOCATION");
+        reloadtypelist.add("SAVEFILES");
+        reloadtypelist.add("LOADFILES");
         if (Bukkit.getPluginManager().isPluginEnabled("Vault")){
             setupPermissions();
             setupChat();
@@ -295,7 +402,6 @@ public class Main extends JavaPlugin implements Listener{
         //BukkitTask TaskName = new PlayerIdle(this).runTaskTimer(this, 20, 20);
         GetStuff();
         unscramble();
-        System.out.print("Kits: " + kits);
         try{
         for (String s : kits){
             loadKit(s);
@@ -349,10 +455,13 @@ public class Main extends JavaPlugin implements Listener{
         }
         if (inGame.isEmpty()) return;
         for (Player player : inGame){
-            restoreInventory(player);
-            player.setHealth(PrevHealth.remove(player.getName()));
-            player.teleport(PreviousPos.remove(player.getName()));
+            Leave(player);
         }
+        int i = this.getServer().getScheduler().scheduleSyncDelayedTask(this, new BukkitRunnable() {
+            public void run() {
+            Bukkit.getPluginManager().enablePlugin(Bukkit.getPluginManager().getPlugin("KitPvP"));
+            }
+        }, 10L);
     }
 
     @EventHandler
@@ -645,12 +754,46 @@ public class Main extends JavaPlugin implements Listener{
                 sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " setspawn");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " kit <KitName>");
                 sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " removekit <KitName>");
+                sender.sendMessage(ChatColor.DARK_GREEN + "/" + label + " reload <ReloadType>");
                 return true;
 
             }
+            if (args[0].equalsIgnoreCase("reload")){
+                if (sender.hasPermission("kitpvp.reload")){
+                    sender.sendMessage(ChatColor.RED + "You haven't got \"kitpvp.reload\" for that!");
+                    return true;
+                }
+                if (arg == 1){
+                    sender.sendMessage(ChatColor.RED + "You need to specify reload type!");
+                    StringBuilder str = new StringBuilder();
+                    for (String re : reloadtypelist){
+                        str.append(re + " ");
+                    }
+                    String list = str.toString();
+
+                    sender.sendMessage(ChatColor.DARK_RED + list);
+                    return true;
+                }
+                if (!reloadtypelist.contains(args[1].toUpperCase())){
+                    sender.sendMessage(ChatColor.RED + "Sorry; that's not a reload type.");
+                    StringBuilder str = new StringBuilder();
+                    for (String re : reloadtypelist){
+                        str.append(re + " ");
+                    }
+                    String list = str.toString();
+
+                    sender.sendMessage(ChatColor.DARK_RED + list);
+                    return true;
+                }
+                String stri = args[1].toUpperCase();
+                RELOADTYPE reload = RELOADTYPE.valueOf(stri);
+                reload(reload,sender);
+                sender.sendMessage(ChatColor.GREEN + "Reloaded");
+                return true;
+            }
             if (args[0].equalsIgnoreCase("removekit")){
                 if (!(sender.hasPermission("kitpvp.removekit"))) {                                    //No permissions
-                    sender.sendMessage(ChatColor.RED + "Try again... When you have permission.");
+                    sender.sendMessage(ChatColor.RED + "You haven't got \"kitpvp.removekit\" for that.");
                     return true;
                 }
                 if (arg != 2){
