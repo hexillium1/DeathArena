@@ -9,6 +9,50 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class PlayerIdle extends BukkitRunnable{
+
+    /*
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+         THIS IS ALL DEAD CODE
+
+     */
     private final JavaPlugin plugin;
     private static ArrayList<Player> array = new ArrayList<Player>();
     private static HashMap<Player, Integer> map = new HashMap<Player, Integer>();

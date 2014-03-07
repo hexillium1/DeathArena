@@ -1,5 +1,6 @@
 package me.oliver276.kitpvp;
 
+import com.avaje.ebean.Update;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.chat.plugins.Chat_PermissionsEx;
 import net.milkbowl.vault.economy.Economy;
@@ -81,12 +82,6 @@ public class Main extends JavaPlugin implements Listener{
     {
         p.getInventory().setContents(inventory);
     }
-
-
-    //
-
-    int tnt = 0;
-
 
 
     private HashMap<String,ItemStack[]> kit = new HashMap<String, ItemStack[]>();
@@ -375,18 +370,24 @@ public class Main extends JavaPlugin implements Listener{
     protected boolean isRestarting = false;
 
     public enum RELOADTYPE {
-        PLUGIN,
-        CONFIG,
-        FILES,
-        SPAWNLOCATION,
-        SAVEFILES,
-        LOADFILES;
+        PLUGIN,       //Disable & Enable
+        CONFIG,       //reloadConfig();
+        FILES,        //Saves, then loads files
+        SPAWNLOCATION,//Re-Gets the spawn location
+        SAVEFILES,    //save the files to disk
+        LOADFILES     //load files without saving
 
     }
     public ArrayList<String> reloadtypelist = new ArrayList<String>();
 
 
     public void onEnable(){
+        if (getConfig().getBoolean("EnableAutoUpdater")){
+            int myID = 72548;
+            Updater updater = new Updater(this, myID,this.getFile(), Updater.UpdateType.DEFAULT,true);
+        }else{
+            getLogger().warning("[KitPvP] The auto-updater is not enabled in the KitPvP config.");
+        }
         reloadtypelist.add("PLUGIN");
         reloadtypelist.add("CONFIG");
         reloadtypelist.add("FILES");
@@ -617,7 +618,6 @@ public class Main extends JavaPlugin implements Listener{
                 World w = ArenaSpawn.getWorld();
                 Location loc = e.getBlockPlaced().getLocation().add(0,1,0);
                 w.spawnEntity(loc, EntityType.PRIMED_TNT);
-                tnt = 1;
                 Location loc1 = e.getBlockPlaced().getLocation();
                 loc1.getWorld().playSound(loc,Sound.FUSE,1F,1F);
             }

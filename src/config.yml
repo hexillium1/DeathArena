@@ -2,3 +2,4 @@ moneyperkill: 5
 currencyname: Pounds
 CommandWhitelist:
   - money
+EnableAutoUpdater: true
