@@ -1,4 +1,6 @@
 moneyperkill: 5
+ImmuneTimeInSeconds: 0
+CobwebDestroyTimeInSeconds: 30
 currencyname: Pounds
 CommandWhitelist:
   - money

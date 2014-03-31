@@ -1,8 +1,6 @@
 package me.oliver276.kitpvp;
 
-import com.avaje.ebean.Update;
 import net.milkbowl.vault.chat.Chat;
-import net.milkbowl.vault.chat.plugins.Chat_PermissionsEx;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.*;
@@ -12,6 +10,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,10 +19,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.SignChangeEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.FoodLevelChangeEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -33,7 +29,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import sun.security.krb5.Config;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
 
 import java.io.File;
 import java.io.IOException;
@@ -93,7 +91,9 @@ public class Main extends JavaPlugin implements Listener{
     private HashMap<String,Location> PreviousPos = new HashMap<String, Location>();
     private HashMap<String,Double> PrevHealth = new HashMap<String, Double>();
     public boolean hasEconomy = false;
-
+    private ArrayList<Player> immuneList = new ArrayList<Player>();
+    private Scoreboard sboard = Bukkit.getScoreboardManager().getNewScoreboard();
+    private Objective objective;
     private List<String> kitlis = null;
 
     public ArrayList<Player> inGame = new ArrayList<Player>();
@@ -117,7 +117,7 @@ public class Main extends JavaPlugin implements Listener{
             }
         }
         p.updateInventory();
-
+        p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
 
     }
 
@@ -145,6 +145,16 @@ public class Main extends JavaPlugin implements Listener{
         for (PotionEffect pot : kitEffects.get(kitname)){
             player.addPotionEffect(pot);
         }
+        final Player player1 = player;
+        immuneList.add(player1);
+        int i = this.getServer().getScheduler().scheduleSyncDelayedTask(this, new BukkitRunnable() {
+            public void run() {
+                if (immuneList.contains(player1)) {
+                    immuneList.remove(player1);
+                }
+            }
+        }, getConfig().getLong("ImmuneTimeInSeconds") * 20);
+        player.setScoreboard(sboard);
     }
 
     public static void onIngameChange(int Added,Player player){
@@ -382,6 +392,9 @@ public class Main extends JavaPlugin implements Listener{
 
 
     public void onEnable(){
+        objective = sboard.registerNewObjective("PlayerHealth", "health");
+        objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        objective.setDisplayName("/ 20");
         if (getConfig().getBoolean("EnableAutoUpdater")){
             int myID = 72548;
             Updater updater = new Updater(this, myID,this.getFile(), Updater.UpdateType.DEFAULT,true);
@@ -427,6 +440,8 @@ public class Main extends JavaPlugin implements Listener{
         }
 
     }
+
+
 
     //@EventHandler (priority  = EventPriority.MONITOR)
     //public void onPlayerMove(PlayerMoveEvent e){
@@ -577,12 +592,20 @@ public class Main extends JavaPlugin implements Listener{
                 semip.addPotionEffects(kitEffects.get(semi));
             }
         }, 10L);
+        immuneList.add(semip);
+        int in = this.getServer().getScheduler().scheduleSyncDelayedTask(this, new BukkitRunnable() {
+            public void run() {
+                if (immuneList.contains(semip)) {
+                    immuneList.remove(semip);
+                }
+            }
+        }, getConfig().getLong("ImmuneTimeInSeconds") * 20);
 
 
     }
     Plugin plugin = this;
 
-    
+
 
     public void giveEffects(Player player, String lastkit){
         for (PotionEffect pot : kitEffects.get(lastkit)){
@@ -612,6 +635,19 @@ public class Main extends JavaPlugin implements Listener{
         if(inGame.contains(e.getPlayer())){
             Block b = e.getBlock();
             ItemStack s = new ItemStack(b.getType());
+
+            final Block bl = e.getBlock();
+            final Block block = e.getBlockReplacedState().getBlock();
+
+            if (s.getType().equals(new ItemStack(Material.WEB).getType())){
+                getServer().getScheduler().scheduleSyncDelayedTask(this.plugin, new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        bl.getWorld().getBlockAt(bl.getLocation()).setType(block.getType());
+                    }
+                },getConfig().getLong("CobwebDestroyTimeInSeconds") * 20 );
+            }
+
             if (s.getType().equals(new ItemStack(Material.TNT).getType())){
                 Material material = e.getBlockReplacedState().getType();
                 b.setType(material);
@@ -647,6 +683,8 @@ public class Main extends JavaPlugin implements Listener{
         }
     }
 
+
+
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent e){
         if(inGame.contains(e.getPlayer())){
@@ -675,26 +713,46 @@ public class Main extends JavaPlugin implements Listener{
     }
 
     @EventHandler
+    public void onEntityDamage(EntityDamageEvent e){
+        if (e.getEntity() instanceof  Player){
+            if (immuneList.contains(e.getEntity())){
+                e.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler
     public void onEntityDamagebyEntity(EntityDamageByEntityEvent e){
+
         if (e.getDamager() instanceof Player && e.getEntity() instanceof Player){
             Player attacker = (Player) e.getDamager();
             Player victim = (Player) e.getEntity();
 
-
             if (inGame.contains(attacker) && (!inGame.contains(victim))){
                 e.setCancelled(true);
                 attacker.sendMessage(ChatColor.RED + "You can't attack players who are not playing!");
-            }
 
-            if (inGame.contains(victim) && (!inGame.contains(attacker))){
+            } else if (inGame.contains(victim) && (!inGame.contains(attacker))){
                 e.setCancelled(true);
                 attacker.sendMessage(ChatColor.RED + "You can't attack players who are in the game!");
+
+            } else if (immuneList.contains(victim)){
+                attacker.sendMessage(ChatColor.RED + "That player is currently immune!");
+                e.setCancelled(true);
+
+            } else if (immuneList.contains(attacker)){
+                immuneList.remove(attacker);
+                attacker.sendMessage(ChatColor.YELLOW + "Your immunity has been revoked - you hit an ingame player.");
             }
+
+
+
         }else if(e.getDamager() instanceof Player){
             Player attacker = (Player) e.getDamager();
             if ((!(inGame.contains(attacker)))) return;
+
             e.setCancelled(true);
-            }else if(e.getEntity() instanceof Player){
+        }else if(e.getEntity() instanceof Player){
             Player victim = (Player) e.getEntity();
 
             if ((!(inGame.contains(victim))) || e.getDamager().getType().equals(EntityType.ARROW) || e.getDamager().getType().equals(EntityType.FISHING_HOOK) || e.getDamager().getType().equals(EntityType.SPLASH_POTION)) return;
@@ -785,6 +843,7 @@ public class Main extends JavaPlugin implements Listener{
                     sender.sendMessage(ChatColor.DARK_RED + list);
                     return true;
                 }
+
                 String stri = args[1].toUpperCase();
                 RELOADTYPE reload = RELOADTYPE.valueOf(stri);
                 reload(reload,sender);
