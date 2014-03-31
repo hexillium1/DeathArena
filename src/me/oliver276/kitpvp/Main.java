@@ -658,7 +658,6 @@ public class Main extends JavaPlugin implements Listener{
                 loc1.getWorld().playSound(loc,Sound.FUSE,1F,1F);
             }
         }
-        return;
     }
 
     @EventHandler
