@@ -1,5 +1,5 @@
 name: KitPvP
-version: 2.1
+version: 2.2
 main: me.oliver276.kitpvp.Main
 description: KitPvP
 softdepend: [Vault]

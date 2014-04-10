@@ -1,5 +1,7 @@
 package me.oliver276.kitpvp;
 
+import com.google.common.eventbus.DeadEvent;
+import com.mysql.jdbc.Buffer;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
@@ -12,6 +14,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -37,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 public class Main extends JavaPlugin implements Listener{
 
@@ -99,8 +103,14 @@ public class Main extends JavaPlugin implements Listener{
     public ArrayList<Player> inGame = new ArrayList<Player>();
 
     public void Leave(Player p){
+        String msg;
+        try {
+            msg = getConfig().getString("LeaveMessage");
+        } catch (Exception ex) {
+            msg = "&6You left KitPvP!";
+        }
         inGame.remove(p);
-        p.sendMessage(ChatColor.GOLD + "You left KitPvP!");
+        p.sendMessage(msg.replaceAll("&","§"));
         Location location = PreviousPos.get(p.getName());
         p.getInventory().clear();
         p.getInventory().setArmorContents(null);
@@ -109,7 +119,6 @@ public class Main extends JavaPlugin implements Listener{
         p.setHealth(PrevHealth.remove(p.getName()));
         LastKit.remove(p.getName());
         PreviousPos.remove(p.getName());
-        onIngameChange(0, p);
         for (PotionEffectType potionEffect : PotionEffectType.values()){
             try{
                 p.removePotionEffect(potionEffect);
@@ -135,7 +144,13 @@ public class Main extends JavaPlugin implements Listener{
         player.teleport(ArenaSpawn);
         inGame.add(player);
         PrevHealth.put(player.getName(), player.getHealth());
-        player.sendMessage(ChatColor.GREEN + "You joined KitPvP");
+        String msg;
+        try {
+            msg = getConfig().getString("JoinMessage");
+        } catch (Exception ex) {
+            msg = "&aYou joined KitPvP!";
+        }
+        player.sendMessage(msg.replaceAll("&","§"));
         player.getInventory().setContents(kit.get(kitname));
         player.getInventory().setArmorContents(kitarm.get(kitname));
         player.teleport(ArenaSpawn);
@@ -157,8 +172,6 @@ public class Main extends JavaPlugin implements Listener{
         player.setScoreboard(sboard);
     }
 
-    public static void onIngameChange(int Added,Player player){
-    }
 
     public void GetStuff(){
         Bukkit.getPluginManager().registerEvents(this,this);
@@ -413,9 +426,42 @@ public class Main extends JavaPlugin implements Listener{
             setupEconomy();
             hasEconomy = true;
         }
-        //BukkitTask TaskName = new PlayerIdle(this).runTaskTimer(this, 20, 20);
         GetStuff();
         unscramble();
+
+        getConfig().addDefault("HasDoneTheUUIDs",false);
+        if (!getConfig().getBoolean("HasDoneTheUUIDs")) {
+            Bukkit.getLogger().warning("[KitPvP] KitPvP is now preparing to convert playernames to UUIDs - prepare for some lag!");
+            List<String> arrayList = new ArrayList<String>();
+            for (OfflinePlayer pl : Bukkit.getServer().getOfflinePlayers()){
+                arrayList.add(pl.getName());
+                System.out.println(pl.getName());
+            }
+            System.out.println(arrayList);
+            UUIDFetcher fetcher = new UUIDFetcher(arrayList);
+            Map<String, UUID> response = null;
+            try {
+                response = UUIDFetcher.call();
+            } catch (Exception e) {
+                getLogger().warning("Exception while running UUIDFetcher");
+                e.printStackTrace();
+            }
+            final Map<String,UUID> res = response;
+            int i = Bukkit.getScheduler().scheduleAsyncDelayedTask(this,new BukkitRunnable() {
+                @Override
+                public void run() {
+                    Bukkit.getLogger().warning("CONVERTING ALL PLAYERS TO UUIDs IN PREPARATION FOR 1.8 -- EXPECT SOME LAGG!!!!!!!!");
+                    for (String name: res.keySet()){
+                        getConfig().set("stats.kills." + res.get(name), getConfig().getInt("stats.kills." + name.toLowerCase()));
+                        getConfig().set("stats.deaths." + res.get(name), getConfig().getInt("stats.deaths." + name.toLowerCase()));
+                    }
+                    getConfig().set("HasDoneTheUUIDs" , true);
+                    saveConfig();
+                    Bukkit.getLogger().info("THE UUID CONVERSION HAS FINISHED ( :) )");
+                }
+            },(res.size() * 20) + 40L);
+
+        }
         try{
         for (String s : kits){
             loadKit(s);
@@ -424,31 +470,33 @@ public class Main extends JavaPlugin implements Listener{
 
         }
         try{
-        for (String s : kits){
-            loadKitArm(s);
-        }
+            for (String s : kits){
+                loadKitArm(s);
+            }
         }catch (Exception ex){
 
         }
 
         try{
-        for (String s : kits){
-            loadKitPot(s);
-        }
+            for (String s : kits){
+                loadKitPot(s);
+            }
         }catch (Exception ex){
 
         }
+        getConfig().addDefault("DeathMessage","&9%killer% &6(on %health% hearts) just killed &9%victim% &6and earned %money% &9%currency%&6.");
+        getConfig().addDefault("DeathMessagePrefix", "&bKitPvP");
+
+        saveConfig();
 
     }
+    /*
+    getServer().getLogger().info(pl.getName());
+                this.getConfig().set("stats.kills." + pl.getPlayer().getUniqueId().toString(), getConfig().getInt("stats.kills." + pl.getName().toLowerCase()));
+                this.getConfig().set("stats.deaths." + pl.getPlayer().getUniqueId().toString(), getConfig().getInt("stats.deaths." + pl.getName().toLowerCase()));
 
+     */
 
-
-    //@EventHandler (priority  = EventPriority.MONITOR)
-    //public void onPlayerMove(PlayerMoveEvent e){
-        //if (inGame.contains(e.getPlayer())){
-          //  PlayerIdle.HeMoved(e.getPlayer());
-        //}
-    //}
 
     public void onDisable(){
         reloadConfig();
@@ -485,18 +533,19 @@ public class Main extends JavaPlugin implements Listener{
         if (!(e.getPlayer().hasPermission("kitpvp.signs"))){
             return;
         }
-        if (!(e.getLine(0).equals("[KitPvP]"))){
+        if (!(e.getLine(0).equals(getConfig().getString("SignStart")))){
             return;
         }
+        String begin = getConfig().getString("SignStart");
         if (e.getLine(1).equals("leave")){
-            e.setLine(0,ChatColor.DARK_BLUE + "[KitPvP]");
+            e.setLine(0,ChatColor.DARK_BLUE + begin);
             e.getPlayer().sendMessage(ChatColor.GOLD + "Leave sign created.");
             return;
         }
         if (e.getLine(1).equals("kit")){
             if (!(kits.contains(e.getLine(2)))){
                 e.getPlayer().sendMessage(ChatColor.RED + "That kit does not exist!");
-                e.setLine(0,ChatColor.DARK_RED + "[KitPvP]");
+                e.setLine(0,ChatColor.DARK_RED + begin);
                 return;
             }
             e.setLine(0,ChatColor.DARK_BLUE + "[KitPvP]");
@@ -506,10 +555,10 @@ public class Main extends JavaPlugin implements Listener{
         if (e.getLine(1).equals("join")){
             if (!(kits.contains(e.getLine(2)))){
                 e.getPlayer().sendMessage(ChatColor.RED + "That kit does not exist!");
-                e.setLine(0,ChatColor.DARK_RED + "[KitPvP]");
+                e.setLine(0,ChatColor.DARK_RED + begin);
                 return;
             }
-            e.setLine(0,ChatColor.DARK_BLUE + "[KitPvP]");
+            e.setLine(0,ChatColor.DARK_BLUE + begin);
             e.getPlayer().sendMessage(ChatColor.GOLD + "Join sign created!");
             return;
         }
@@ -523,7 +572,8 @@ public class Main extends JavaPlugin implements Listener{
         try {
             if (e.getClickedBlock().getState().getType().equals(Material.SIGN_POST) || e.getClickedBlock().getState().getType().equals(Material.WALL_SIGN)) {
                 Sign sign = (Sign) e.getClickedBlock().getState();
-                if (!(sign.getLine(0).equalsIgnoreCase(ChatColor.DARK_BLUE + "[KitPvP]"))) return;
+                String begin = getConfig().getString("SignStart");
+                if (!(sign.getLine(0).equalsIgnoreCase(ChatColor.DARK_BLUE + begin))) return;
                 if (sign.getLine(1).equalsIgnoreCase("join")) {
                     if (inGame.contains(e.getPlayer())) {
                         e.getPlayer().sendMessage(ChatColor.RED + "You're already in the game!  To change kits, use a kit sign.");
@@ -687,7 +737,6 @@ public class Main extends JavaPlugin implements Listener{
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent e){
         if(inGame.contains(e.getPlayer())){
-            onIngameChange(0,e.getPlayer());
             Leave(e.getPlayer());
         }
     }
@@ -707,7 +756,13 @@ public class Main extends JavaPlugin implements Listener{
             return;
 
         }
-        e.getPlayer().sendMessage(ChatColor.DARK_RED + "You can't use that in here. If you want to leave, use " + ChatColor.YELLOW + "/leave");
+        String str;
+        try{
+            str = getConfig().getString("BadCommand");
+        } catch (Exception ex){
+            str = "&4You can't use that in here. If you want to leave, use &6/leave";
+        }
+        e.getPlayer().sendMessage(str.replaceAll("&","§"));
         e.setCancelled(true);
     }
 
@@ -767,24 +822,70 @@ public class Main extends JavaPlugin implements Listener{
                 e.getDrops().clear();
             }
         if(inGame.contains(e.getEntity())&&inGame.contains(e.getEntity().getKiller())){
+            List<String> strList = new ArrayList<String>();
+            strList.add(e.getEntity().getPlayer().getName());
+            strList.add(e.getEntity().getKiller().getName());
+            me.oliver276.docs.java.UUIDFetcher fetcher = new me.oliver276.docs.java.UUIDFetcher(strList);
             e.getDrops().clear();
+            if (getConfig().getBoolean("DropGoldenApple")){
+               e.getDrops().add(new ItemStack(Material.GOLDEN_APPLE));
+            }
             e.setDeathMessage(null);
             Player died = e.getEntity();
             Player killer = died.getKiller();
-            if (died != killer){                              // Make sure that the player hasn't killed them self
+            final Boolean suicide;
+            if (died != killer){                         // Make sure that the player hasn't killed them self
                 Double hearts = killer.getHealth();
-                Bukkit.getServer().broadcastMessage(ChatColor.AQUA + "[KitPvP] " + ChatColor.BLUE + killer.getName() + ChatColor.GOLD + " (on " + ( (Math.round(hearts) + 0.1) - 0.1) /2 + " hearts) just killed " + ChatColor.BLUE + died.getName() + ChatColor.GOLD + " and earned " + getConfig().getInt("moneyperkill")+ " " + ChatColor.BLUE+ getConfig().getString("currencyname") + ChatColor.GOLD + ".");
+                reloadConfig();
+                hearts = (((Math.round(hearts) + 0.1) - 0.1) / 2);
+                String DeathMessage;
+                try{
+                    DeathMessage = (getConfig().getString("DeathMessagePrefix") + " " + getConfig().getString("DeathMessage"));
+                }catch (Exception ex){
+                    DeathMessage = "&9%killer% &6(on %health% hearts) just killed &9%victim% &6and earned %money% &9%currency%&6.";
+                }
+                DeathMessage = DeathMessage.replaceAll("%killer%",killer.getName());
+                DeathMessage = DeathMessage.replaceAll("%victim%",died.getName());
+                DeathMessage = DeathMessage.replaceAll("%health%", hearts.toString());
+                DeathMessage = DeathMessage.replaceAll("%money%",getConfig().getString("moneyperkill"));
+                DeathMessage = DeathMessage.replaceAll("%currency%",getConfig().getString("currencyname"));
+                DeathMessage = DeathMessage.replace('&','§');
+                Bukkit.getServer().broadcastMessage(DeathMessage);
                 economy.depositPlayer(killer.getName(),getConfig().getInt("moneyperkill"));
-                getConfig().set("stats.kills." + killer.getName().toLowerCase(),getConfig().getInt(("stats.kills." + killer.getName().toLowerCase())) + 1);
+                suicide = false;
+            }else{
+                suicide = true;
             }
-            getConfig().set("stats.deaths." + died.getName().toLowerCase(),getConfig().getInt(("stats.deaths." + died.getName().toLowerCase())) + 1);
+            final Map<String,UUID> uuidMap = me.oliver276.docs.java.UUIDFetcher.call();
+            final String killerName = killer.getName();
+            final String killedName = died.getName();
+            int i = Bukkit.getScheduler().scheduleAsyncDelayedTask(this,new BukkitRunnable() {
+                @Override
+                public void run() {
 
+                    if (!suicide){
+                        getConfig().set("stats.kills." + uuidMap.get(killerName).toString(),getConfig().getInt(("stats.kills." + uuidMap.get(killerName).toString())) + 1);
+                    }
+                    getConfig().set("stats.deaths." + uuidMap.get(killedName).toString(),getConfig().getInt(("stats.deaths." + uuidMap.get(killedName).toString())) + 1);
+                    saveConfig();
+                }
+            });
             saveConfig();
 
             e.getEntity().getInventory().clear();
         }
         }catch(Exception ex){
 
+        }
+    }
+
+    @EventHandler
+    public void onPlayerPickup(PlayerPickupItemEvent e){
+        if (!(inGame.contains(e.getPlayer()))) return;
+        if (e.getItem().getItemStack().getType().equals(Material.GOLDEN_APPLE)){
+            e.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,10 * 20,2));
+            e.getItem().remove();
+            e.getPlayer().getInventory().remove(Material.GOLDEN_APPLE);
         }
     }
 
@@ -799,8 +900,8 @@ public class Main extends JavaPlugin implements Listener{
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if(cmd.getName().equalsIgnoreCase("KitPvP")){
+    public boolean onCommand(final CommandSender sender, Command cmd, String label, String[] args) {
+        if(cmd.getName().equalsIgnoreCase("KitPvP") || cmd.getName().equalsIgnoreCase("deatharena")){
             int arg = args.length;
             if (arg == 0 || args[0].equalsIgnoreCase("help")){
                 sender.sendMessage(ChatColor.GREEN + "-=-=-= KitPvP Help =-=-=-");
@@ -888,7 +989,47 @@ public class Main extends JavaPlugin implements Listener{
                         s.deleteOnExit();
                     }
                 }
-                sender.sendMessage(ChatColor.GOLD + "Done, but you'll need to actually delete the files...");                           //Bug
+                sender.sendMessage(ChatColor.GOLD + "Done, but you'll need to actually delete the files...");                           //#WTFBug
+                return true;
+            }
+            if (args[0].equalsIgnoreCase("givekit")){
+                if (!(sender.hasPermission("kitpvp.givekit"))){
+                    sender.sendMessage(ChatColor.RED + "No permission :'(");
+                    return true;
+                }
+                if (!(args.length == 3)){
+                    sender.sendMessage(ChatColor.RED + "Wrong number of arguments!");
+                    sender.sendMessage(ChatColor.GOLD + "This is the correct use: " + ChatColor.DARK_GREEN + "/kitpvp givekit <kit> <Player>");
+                    return true;
+                }
+                String kit = args[1];
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null){
+                    sender.sendMessage(ChatColor.RED + "Error 404: " + ChatColor.DARK_RED + "Player was not found!");
+                    return true;
+                }
+
+
+                if (ArenaSpawn == null){
+                    sender.sendMessage(ChatColor.RED + "Error! The KitPvP spawn has not been set!");
+                    return true;
+                }
+
+                if (kits.isEmpty() || kit.isEmpty() || kitarm.isEmpty()){
+                    sender.sendMessage(ChatColor.RED + "Error! There are no available kits!");
+                    return true;
+                }
+
+                if (inGame.contains(target)){
+                    sender.sendMessage(ChatColor.DARK_RED + "That player is already in the game!");
+                    return true;
+                }
+                if ((!(kits.contains(kit)))){
+                    sender.sendMessage(ChatColor.DARK_RED + "The "+ kit +" kit does not exist!  These kits exist:");
+                    sender.sendMessage(ChatColor.GOLD + kits.toString());
+                    return true;
+                }
+                Join(target,kit);
                 return true;
             }
             if (args[0].equalsIgnoreCase("kit")){
@@ -923,29 +1064,58 @@ public class Main extends JavaPlugin implements Listener{
                 return true;
             }
             if (args[0].equalsIgnoreCase("stats")){
-                if (!(sender instanceof Player)){
+                if ((!(sender instanceof Player)) && args.length == 1){
                     sender.sendMessage(ChatColor.RED + "The console cannot check their stats!");
                     return true;
                 }
                 reloadConfig();
                 String player = null;
+                Map<String, UUID> response = new HashMap<String,UUID>();
                 if (arg == 1){
                     player = ((Player) sender).getName();
                 }else{
                     player = args[1];
                 }
+                List<String> list = new ArrayList<String>();
+                list.add(player);
+                UUIDFetcher fetcher = new UUIDFetcher(list);
 
-                int kills = getConfig().getInt("stats.kills." + player.toLowerCase());
-                int deaths = getConfig().getInt("stats.deaths." + player.toLowerCase());
+                try {
+                    response = UUIDFetcher.call();
+                } catch (Exception e) {
+                    getLogger().warning("Exception while running UUIDFetcher");
+                    e.printStackTrace();
+                    Map<String,UUID> frog = new HashMap<String, UUID>();
+                    frog.put(player,null);
+                    response = frog;
+                }
+                final String finalPlayer = player;
+                final Map<String, UUID> finalResponse = response;
+                int i = Bukkit.getScheduler().scheduleAsyncDelayedTask(this,new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        UUID finalPlayerPath;
+                        finalPlayerPath = finalResponse.get(finalPlayer);
 
 
-                sender.sendMessage(ChatColor.GOLD + "-=-=-=-= KitPvP Stats =-=-=-=-");
+                        if (finalPlayerPath == null){
+                            sender.sendMessage(ChatColor.RED + "Sorry, that player was not found!");
+                        }  else{
+                            int kills = getConfig().getInt("stats.kills." + finalPlayerPath.toString());
+                            int deaths = getConfig().getInt("stats.deaths." + finalPlayerPath.toString());
 
-                sender.sendMessage(ChatColor.GREEN + player + "'s Player Kills: " + ChatColor.DARK_GREEN + kills + ChatColor.GREEN + "!");
-                sender.sendMessage(ChatColor.GREEN + player + "'s Deaths: " + ChatColor.DARK_GREEN + deaths + ChatColor.GREEN + "!");
-                sender.sendMessage(ChatColor.GREEN + player + "'s K/D Ratio: " + ChatColor.DARK_GREEN + kills / deaths + ChatColor.GREEN + "!");
-                return true;
+                            sender.sendMessage(ChatColor.GOLD + "-=-=-=-= KitPvP Stats =-=-=-=-");
+
+                            sender.sendMessage(ChatColor.GREEN + finalPlayer + "'s Player Kills: " + ChatColor.DARK_GREEN + kills + ChatColor.GREEN + "!");
+                            sender.sendMessage(ChatColor.GREEN + finalPlayer + "'s Deaths: " + ChatColor.DARK_GREEN + deaths + ChatColor.GREEN + "!");
+                            sender.sendMessage(ChatColor.GREEN + finalPlayer + "'s K/D Ratio: " + ChatColor.DARK_GREEN + kills / deaths + ChatColor.GREEN + "!");
+                        }
+                    }
+                });
+                    return true;
+                }
             }
+
             if (args[0].equalsIgnoreCase("join")){
                 if (!(sender instanceof Player)){
                     sender.sendMessage(ChatColor.RED + "The console cannot play :(");
@@ -971,7 +1141,7 @@ public class Main extends JavaPlugin implements Listener{
                     sender.sendMessage(ChatColor.DARK_RED + "You're already in the game - I know it's good, but carry on with the one you're in!");
                     return true;
                 }
-                if (arg < 2){
+                if (args.length < 2){
                     sender.sendMessage(ChatColor.DARK_RED + "You have not specified a kit! These kits currently exist:");
                     sender.sendMessage(ChatColor.GOLD + kits.toString());
                     return true;
@@ -1041,7 +1211,8 @@ public class Main extends JavaPlugin implements Listener{
                 return true;
             }
             sender.sendMessage(ChatColor.RED + "Not a KitPvP command. Do " + ChatColor.YELLOW + "/" +  label + " help" + ChatColor.RED + " for command help.");
-        }
         return true;
     }
+
 }
+
